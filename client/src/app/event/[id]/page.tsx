@@ -1,0 +1,114 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import { apiFetch, API_BASE } from "@/lib/api";
+import type { Event, Prompt, Submission } from "@/lib/types";
+import Countdown from "@/components/Countdown";
+
+const POLL_INTERVAL = 30_000;
+
+export default function CanvasPage() {
+  const { id } = useParams<{ id: string }>();
+  const [event, setEvent] = useState<Event | null>(null);
+  const [prompt, setPrompt] = useState<Prompt | null>(null);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const ev = await apiFetch<Event>(`/api/events/${id}`);
+      setEvent(ev);
+      const data = await apiFetch<{ submissions: Submission[]; prompt: Prompt | null }>(
+        `/api/events/${id}/submissions`
+      );
+      setPrompt(data.prompt);
+      setSubmissions(data.submissions);
+    } catch {
+      /* event might not exist yet */
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, POLL_INTERVAL);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-pulse text-zinc-400">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!event) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p className="text-zinc-400">Event not found.</p>
+      </div>
+    );
+  }
+
+  const isActive = prompt?.active && prompt.fired_at;
+
+  return (
+    <main className="max-w-5xl mx-auto px-4 py-6">
+      <header className="mb-6">
+        <h1 className="text-2xl font-bold tracking-tight">{event.name}</h1>
+
+        {isActive && prompt ? (
+          <div className="mt-3 rounded-xl bg-zinc-800/80 border border-zinc-700 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="text-sm text-zinc-400 uppercase tracking-wider">Current prompt</p>
+              <p className="text-lg font-medium mt-1">{prompt.text}</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <Countdown firedAt={prompt.fired_at!} durationSeconds={prompt.duration_seconds} />
+              <Link
+                href={`/event/${id}/submit`}
+                className="bg-white text-black font-semibold rounded-lg px-5 py-2.5 text-sm hover:bg-zinc-200 transition-colors"
+              >
+                Submit Photo
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 rounded-xl bg-zinc-800/60 border border-zinc-700/50 p-8 text-center">
+            <div className="text-3xl mb-2">📷</div>
+            <p className="text-zinc-400">Waiting for the next prompt...</p>
+          </div>
+        )}
+      </header>
+
+      {submissions.length === 0 && isActive && (
+        <p className="text-center text-zinc-500 mt-12">
+          No submissions yet — be the first!
+        </p>
+      )}
+
+      <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4">
+        {submissions.map((sub) => (
+          <div
+            key={sub.id}
+            className="break-inside-avoid rounded-xl overflow-hidden bg-zinc-800/50 border border-zinc-700/50"
+          >
+            <img
+              src={`${API_BASE}${sub.image_url}`}
+              alt="Submission"
+              className="w-full object-cover"
+              loading="lazy"
+            />
+            <div className="px-3 py-2 text-xs text-zinc-500">
+              {new Date(sub.submitted_at).toLocaleTimeString()}
+            </div>
+          </div>
+        ))}
+      </div>
+    </main>
+  );
+}
