@@ -22,8 +22,11 @@ export default function LandingPage() {
         { id: string; access_type: string; access_value: string }[]
       >("/organizer/events");
 
+      const needle = code.trim().toUpperCase();
       const match = events.find(
-        (ev) => ev.access_type === "code" && ev.access_value === code.trim()
+        (ev) =>
+          ev.access_type === "code" &&
+          String(ev.access_value).toUpperCase() === needle
       );
       if (!match) {
         setError("Invalid event code");
@@ -33,7 +36,7 @@ export default function LandingPage() {
       await apiFetch(`/api/events/${match.id}/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: code.trim() }),
+        body: JSON.stringify({ code: String(match.access_value) }),
       });
 
       router.push(`/event/${match.id}`);

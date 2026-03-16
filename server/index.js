@@ -55,7 +55,7 @@ app.post("/api/events/:id/verify", (req, res) => {
 
   if (event.access_type === "code") {
     const { code } = req.body;
-    if (code === event.access_value) {
+    if (String(code).toUpperCase() === String(event.access_value).toUpperCase()) {
       return res.json({ ok: true, event_id: event.id });
     }
     return res.status(403).json({ ok: false, error: "invalid code" });
