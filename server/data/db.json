@@ -1,0 +1,41 @@
+{
+  "events": {
+    "evt-demo-123": {
+      "id": "evt-demo-123",
+      "name": "Fake Demo Event",
+      "access_type": "code",
+      "access_value": "DEMO12",
+      "prompts": [
+        "prm-demo-1"
+      ]
+    }
+  },
+  "prompts": {
+    "prm-demo-1": {
+      "id": "prm-demo-1",
+      "event_id": "evt-demo-123",
+      "text": "Show me your fake BeReal moment",
+      "fired_at": "2026-03-16T20:00:00.000Z",
+      "duration_seconds": 300,
+      "active": true
+    }
+  },
+  "submissions": {
+    "sub-demo-1": {
+      "id": "sub-demo-1",
+      "prompt_id": "prm-demo-1",
+      "user_session_id": "fake-user-1",
+      "image_url": "/uploads/fake-image-1.jpg",
+      "validated": true,
+      "submitted_at": "2026-03-16T20:01:30.000Z"
+    },
+    "sub-demo-2": {
+      "id": "sub-demo-2",
+      "prompt_id": "prm-demo-1",
+      "user_session_id": "fake-user-2",
+      "image_url": "/uploads/fake-image-2.jpg",
+      "validated": true,
+      "submitted_at": "2026-03-16T20:02:10.000Z"
+    }
+  }
+}
