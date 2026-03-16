@@ -95,12 +95,6 @@ app.post("/api/events/:id/submit", upload.single("image"), async (req, res) => {
     return res.status(400).json({ error: "no active prompt" });
   }
 
-  const elapsed =
-    (Date.now() - new Date(activePrompt.fired_at).getTime()) / 1000;
-  if (elapsed > activePrompt.duration_seconds) {
-    return res.status(400).json({ error: "prompt time window expired" });
-  }
-
   const { user_session_id } = req.body;
   if (!user_session_id) {
     return res.status(400).json({ error: "user_session_id required" });

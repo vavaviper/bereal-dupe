@@ -36,6 +36,14 @@
       "image_url": "/uploads/fake-image-2.jpg",
       "validated": true,
       "submitted_at": "2026-03-16T20:02:10.000Z"
+    },
+    "885378a4-57aa-481f-848b-167a02097147": {
+      "id": "885378a4-57aa-481f-848b-167a02097147",
+      "prompt_id": "prm-demo-1",
+      "user_session_id": "64066b5f-9c3d-4e68-8b1d-795df0ad78f1",
+      "image_url": "/uploads/cd801fb0-f85d-4f66-84df-da7ef2d06cec.jpg",
+      "validated": true,
+      "submitted_at": "2026-03-16T23:06:41.584Z"
     }
   }
 }
