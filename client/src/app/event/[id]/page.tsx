@@ -4,9 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { apiFetch, API_BASE } from "@/lib/api";
-import type { Event, Prompt, Submission, User } from "@/lib/types";
+import type { Event, Prompt, Submission } from "@/lib/types";
 import Countdown from "@/components/Countdown";
-import UsernamePrompt from "@/components/UsernamePrompt";
 
 const POLL_INTERVAL = 30_000;
 
@@ -15,7 +14,6 @@ export default function CanvasPage() {
   const [event, setEvent] = useState<Event | null>(null);
   const [prompt, setPrompt] = useState<Prompt | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [userMap, setUserMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -27,17 +25,6 @@ export default function CanvasPage() {
       );
       setPrompt(data.prompt);
       setSubmissions(data.submissions);
-
-      const sessionIds = [...new Set(data.submissions.map((s) => s.user_session_id))];
-      const users: Record<string, string> = {};
-      await Promise.all(
-        sessionIds.map((sid) =>
-          apiFetch<User>(`/api/users/${sid}`)
-            .then((u) => { users[sid] = u.username; })
-            .catch(() => { users[sid] = "Anonymous"; })
-        )
-      );
-      setUserMap(users);
     } catch {
       /* event might not exist yet */
     } finally {
@@ -71,8 +58,6 @@ export default function CanvasPage() {
 
   return (
     <main className="max-w-5xl mx-auto px-4 py-6">
-      <UsernamePrompt />
-
       <header className="mb-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight">{event.name}</h1>
@@ -138,13 +123,8 @@ export default function CanvasPage() {
                 {sub.validated ? "Verified" : "Unverified"}
               </span>
             </div>
-            <div className="px-3 py-2 flex items-center justify-between">
-              <span className="text-sm font-medium truncate">
-                {userMap[sub.user_session_id] || "Anonymous"}
-              </span>
-              <span className="text-xs text-zinc-500 shrink-0 ml-2">
-                {new Date(sub.submitted_at).toLocaleTimeString()}
-              </span>
+            <div className="px-3 py-2 text-xs text-zinc-500">
+              {new Date(sub.submitted_at).toLocaleTimeString()}
             </div>
           </div>
         ))}

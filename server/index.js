@@ -129,23 +129,6 @@ app.post("/api/events/:id/submit", upload.single("image"), async (req, res) => {
   res.status(201).json(submission);
 });
 
-// ── User routes ────────────────────────────────────────────────
-
-app.post("/api/users", (req, res) => {
-  const { session_id, username } = req.body;
-  if (!session_id || !username?.trim()) {
-    return res.status(400).json({ error: "session_id and username required" });
-  }
-  const user = store.createOrUpdateUser(session_id, username.trim());
-  res.status(201).json(user);
-});
-
-app.get("/api/users/:session_id", (req, res) => {
-  const user = store.getUser(req.params.session_id);
-  if (!user) return res.status(404).json({ error: "user not found" });
-  res.json(user);
-});
-
 // ── Leaderboard ────────────────────────────────────────────────
 
 app.get("/api/leaderboard", (_req, res) => {

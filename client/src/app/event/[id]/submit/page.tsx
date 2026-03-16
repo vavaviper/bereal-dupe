@@ -6,7 +6,6 @@ import { apiFetch, API_BASE } from "@/lib/api";
 import { getSessionId } from "@/lib/session";
 import type { Event, Prompt, Submission } from "@/lib/types";
 import Countdown from "@/components/Countdown";
-import UsernamePrompt from "@/components/UsernamePrompt";
 
 export default function SubmitPage() {
   const { id } = useParams<{ id: string }>();
@@ -125,8 +124,6 @@ export default function SubmitPage() {
 
   return (
     <main className="max-w-md mx-auto px-4 py-8">
-      <UsernamePrompt />
-
       <button
         onClick={() => router.push(`/event/${id}`)}
         className="text-sm text-zinc-500 hover:text-zinc-300 mb-4 inline-block"

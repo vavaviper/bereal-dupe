@@ -15,7 +15,7 @@ const MIME_MAP = {
 
 async function validateImage(imagePath, promptText) {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-05-20" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const ext = path.extname(imagePath).toLowerCase();
     const mimeType = MIME_MAP[ext] || "image/jpeg";

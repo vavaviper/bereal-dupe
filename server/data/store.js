@@ -104,23 +104,6 @@ function createSubmission(submission) {
   return submission;
 }
 
-// ── Users ──────────────────────────────────────────────────────
-
-function getUser(sessionId) {
-  return load().users[sessionId] ?? null;
-}
-
-function getAllUsers() {
-  return load().users;
-}
-
-function createOrUpdateUser(sessionId, username) {
-  const data = load();
-  data.users[sessionId] = { session_id: sessionId, username };
-  save(data);
-  return data.users[sessionId];
-}
-
 // ── Leaderboard ────────────────────────────────────────────────
 
 function getLeaderboard() {
@@ -161,8 +144,5 @@ module.exports = {
   getSubmissionBySession,
   getAllSubmissions,
   createSubmission,
-  getUser,
-  getAllUsers,
-  createOrUpdateUser,
   getLeaderboard,
 };

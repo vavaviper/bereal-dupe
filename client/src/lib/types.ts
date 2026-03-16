@@ -23,12 +23,6 @@ export interface Submission {
   validated: boolean;
   confidence: number;
   submitted_at: string;
-  username?: string;
-}
-
-export interface User {
-  session_id: string;
-  username: string;
 }
 
 export interface LeaderboardEntry {
