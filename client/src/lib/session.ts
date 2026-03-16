@@ -9,3 +9,17 @@ export function getSessionId(): string {
   }
   return id;
 }
+
+export function getUsername(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("candid_username");
+}
+
+export function setUsername(name: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem("candid_username", name);
+}
+
+export function hasUsername(): boolean {
+  return !!getUsername();
+}

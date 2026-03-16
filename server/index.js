@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
@@ -80,9 +81,7 @@ app.get("/api/events/:id/submissions", (req, res) => {
   if (!event) return res.status(404).json({ error: "event not found" });
   const activePrompt = store.getActivePrompt(event.id);
   if (!activePrompt) return res.json({ submissions: [], prompt: null });
-  const subs = store
-    .getSubmissionsByPrompt(activePrompt.id)
-    .filter((s) => s.validated);
+  const subs = store.getSubmissionsByPrompt(activePrompt.id);
   res.json({ submissions: subs, prompt: activePrompt });
 });
 
@@ -123,10 +122,34 @@ app.post("/api/events/:id/submit", upload.single("image"), async (req, res) => {
     user_session_id,
     image_url: `/uploads/${req.file.filename}`,
     validated: result.valid,
+    confidence: result.confidence,
     submitted_at: new Date().toISOString(),
   };
   store.createSubmission(submission);
   res.status(201).json(submission);
+});
+
+// ── User routes ────────────────────────────────────────────────
+
+app.post("/api/users", (req, res) => {
+  const { session_id, username } = req.body;
+  if (!session_id || !username?.trim()) {
+    return res.status(400).json({ error: "session_id and username required" });
+  }
+  const user = store.createOrUpdateUser(session_id, username.trim());
+  res.status(201).json(user);
+});
+
+app.get("/api/users/:session_id", (req, res) => {
+  const user = store.getUser(req.params.session_id);
+  if (!user) return res.status(404).json({ error: "user not found" });
+  res.json(user);
+});
+
+// ── Leaderboard ────────────────────────────────────────────────
+
+app.get("/api/leaderboard", (_req, res) => {
+  res.json(store.getLeaderboard());
 });
 
 // ── Organizer routes ───────────────────────────────────────────

@@ -4,8 +4,9 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { apiFetch, API_BASE } from "@/lib/api";
 import { getSessionId } from "@/lib/session";
-import type { Event, Prompt } from "@/lib/types";
+import type { Event, Prompt, Submission } from "@/lib/types";
 import Countdown from "@/components/Countdown";
+import UsernamePrompt from "@/components/UsernamePrompt";
 
 export default function SubmitPage() {
   const { id } = useParams<{ id: string }>();
@@ -16,6 +17,7 @@ export default function SubmitPage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<Submission | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchEvent = useCallback(async () => {
@@ -39,6 +41,7 @@ export default function SubmitPage() {
     if (!f) return;
     setFile(f);
     setPreview(URL.createObjectURL(f));
+    setResult(null);
   }
 
   async function handleSubmit() {
@@ -51,16 +54,15 @@ export default function SubmitPage() {
     form.append("user_session_id", getSessionId());
 
     try {
-      await fetch(`${API_BASE}/api/events/${id}/submit`, {
+      const res = await fetch(`${API_BASE}/api/events/${id}/submit`, {
         method: "POST",
         body: form,
-      }).then(async (res) => {
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error(body.error || `Upload failed (${res.status})`);
-        }
       });
-      router.push(`/event/${id}`);
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || `Upload failed (${res.status})`);
+      }
+      setResult(body as Submission);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -90,8 +92,41 @@ export default function SubmitPage() {
     );
   }
 
+  if (result) {
+    return (
+      <main className="max-w-md mx-auto px-4 py-8">
+        <div className={`rounded-xl border p-6 text-center ${
+          result.validated
+            ? "bg-green-900/20 border-green-700/50"
+            : "bg-yellow-900/20 border-yellow-700/50"
+        }`}>
+          <div className="text-4xl mb-3">{result.validated ? "✅" : "⚠️"}</div>
+          <h2 className="text-lg font-semibold mb-1">
+            {result.validated ? "Photo Verified!" : "Photo Submitted (Unverified)"}
+          </h2>
+          <p className="text-sm text-zinc-400 mb-1">
+            {result.validated
+              ? "Your submission matches the prompt."
+              : "Your photo was submitted but couldn't be verified against the prompt."}
+          </p>
+          <p className="text-xs text-zinc-500 mb-4">
+            Confidence: {Math.round((result.confidence ?? 0) * 100)}%
+          </p>
+          <button
+            onClick={() => router.push(`/event/${id}`)}
+            className="bg-white text-black font-semibold rounded-lg px-6 py-2.5 text-sm hover:bg-zinc-200 transition-colors"
+          >
+            Back to Canvas
+          </button>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="max-w-md mx-auto px-4 py-8">
+      <UsernamePrompt />
+
       <button
         onClick={() => router.push(`/event/${id}`)}
         className="text-sm text-zinc-500 hover:text-zinc-300 mb-4 inline-block"
@@ -146,7 +181,7 @@ export default function SubmitPage() {
           disabled={!file || submitting}
           className="w-full bg-white text-black font-semibold rounded-lg py-3 text-sm hover:bg-zinc-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {submitting ? "Uploading..." : "Submit Photo"}
+          {submitting ? "Verifying..." : "Submit Photo"}
         </button>
       </div>
     </main>

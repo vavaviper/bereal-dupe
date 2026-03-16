@@ -21,5 +21,20 @@ export interface Submission {
   user_session_id: string;
   image_url: string;
   validated: boolean;
+  confidence: number;
   submitted_at: string;
+  username?: string;
+}
+
+export interface User {
+  session_id: string;
+  username: string;
+}
+
+export interface LeaderboardEntry {
+  session_id: string;
+  username: string;
+  score: number;
+  validated: number;
+  total: number;
 }

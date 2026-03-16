@@ -3,11 +3,13 @@ const path = require("path");
 
 const DATA_FILE = path.join(__dirname, "db.json");
 
-const empty = () => ({ events: {}, prompts: {}, submissions: {} });
+const empty = () => ({ events: {}, prompts: {}, submissions: {}, users: {} });
 
 function load() {
   try {
-    return JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
+    const data = JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
+    if (!data.users) data.users = {};
+    return data;
   } catch {
     return empty();
   }
@@ -20,6 +22,8 @@ function save(data) {
 function getAll() {
   return load();
 }
+
+// ── Events ─────────────────────────────────────────────────────
 
 function getEvents() {
   return Object.values(load().events);
@@ -35,6 +39,8 @@ function createEvent(event) {
   save(data);
   return event;
 }
+
+// ── Prompts ────────────────────────────────────────────────────
 
 function getPromptsByEvent(eventId) {
   const data = load();
@@ -69,6 +75,8 @@ function getActivePrompt(eventId) {
   );
 }
 
+// ── Submissions ────────────────────────────────────────────────
+
 function getSubmissionsByPrompt(promptId) {
   const data = load();
   return Object.values(data.submissions).filter(
@@ -85,11 +93,58 @@ function getSubmissionBySession(promptId, sessionId) {
   );
 }
 
+function getAllSubmissions() {
+  return Object.values(load().submissions);
+}
+
 function createSubmission(submission) {
   const data = load();
   data.submissions[submission.id] = submission;
   save(data);
   return submission;
+}
+
+// ── Users ──────────────────────────────────────────────────────
+
+function getUser(sessionId) {
+  return load().users[sessionId] ?? null;
+}
+
+function getAllUsers() {
+  return load().users;
+}
+
+function createOrUpdateUser(sessionId, username) {
+  const data = load();
+  data.users[sessionId] = { session_id: sessionId, username };
+  save(data);
+  return data.users[sessionId];
+}
+
+// ── Leaderboard ────────────────────────────────────────────────
+
+function getLeaderboard() {
+  const data = load();
+  const submissions = Object.values(data.submissions);
+  const users = data.users || {};
+
+  const scores = {};
+  for (const sub of submissions) {
+    const sid = sub.user_session_id;
+    if (!scores[sid]) {
+      scores[sid] = { session_id: sid, validated: 0, total: 0 };
+    }
+    scores[sid].total++;
+    if (sub.validated) scores[sid].validated++;
+  }
+
+  return Object.values(scores)
+    .map((entry) => ({
+      ...entry,
+      username: users[entry.session_id]?.username || "Anonymous",
+      score: entry.validated,
+    }))
+    .sort((a, b) => b.score - a.score || a.username.localeCompare(b.username));
 }
 
 module.exports = {
@@ -104,5 +159,10 @@ module.exports = {
   getActivePrompt,
   getSubmissionsByPrompt,
   getSubmissionBySession,
+  getAllSubmissions,
   createSubmission,
+  getUser,
+  getAllUsers,
+  createOrUpdateUser,
+  getLeaderboard,
 };
