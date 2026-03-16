@@ -3,7 +3,7 @@ const path = require("path");
 
 const DATA_FILE = path.join(__dirname, "db.json");
 
-const empty = () => ({ events: {}, prompts: {}, submissions: {} });
+const empty = () => ({ events: {}, prompts: {}, submissions: {}, participants: {} });
 
 function load() {
   try {
@@ -92,17 +92,84 @@ function createSubmission(submission) {
   return submission;
 }
 
+function updateEvent(id, updates) {
+  const data = load();
+  if (!data.events[id]) return null;
+  Object.assign(data.events[id], updates);
+  save(data);
+  return data.events[id];
+}
+
+function deletePrompt(id) {
+  const data = load();
+  if (!data.prompts[id]) return false;
+  delete data.prompts[id];
+  save(data);
+  return true;
+}
+
+function getParticipantsByEvent(eventId) {
+  const data = load();
+  if (!data.participants) return [];
+  return Object.values(data.participants).filter((p) => p.event_id === eventId);
+}
+
+function createParticipant(participant) {
+  const data = load();
+  if (!data.participants) data.participants = {};
+  data.participants[participant.id] = participant;
+  save(data);
+  return participant;
+}
+
+function getParticipantBySession(eventId, sessionId) {
+  const data = load();
+  if (!data.participants) return null;
+  return (
+    Object.values(data.participants).find(
+      (p) => p.event_id === eventId && p.session_id === sessionId
+    ) ?? null
+  );
+}
+
+function deleteParticipant(id) {
+  const data = load();
+  if (!data.participants || !data.participants[id]) return false;
+  delete data.participants[id];
+  save(data);
+  return true;
+}
+
+function getSubmissionsByEvent(eventId) {
+  const data = load();
+  const promptIds = new Set(
+    Object.values(data.prompts)
+      .filter((p) => p.event_id === eventId)
+      .map((p) => p.id)
+  );
+  return Object.values(data.submissions).filter((s) =>
+    promptIds.has(s.prompt_id)
+  );
+}
+
 module.exports = {
   getAll,
   getEvents,
   getEvent,
   createEvent,
+  updateEvent,
   getPromptsByEvent,
   getPrompt,
   createPrompt,
   updatePrompt,
   getActivePrompt,
+  deletePrompt,
   getSubmissionsByPrompt,
   getSubmissionBySession,
+  getSubmissionsByEvent,
   createSubmission,
+  getParticipantsByEvent,
+  createParticipant,
+  getParticipantBySession,
+  deleteParticipant,
 };

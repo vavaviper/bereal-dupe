@@ -3,10 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api";
+import { getSessionId } from "@/lib/session";
 
 export default function LandingPage() {
   const router = useRouter();
   const [code, setCode] = useState("");
+  const [name, setName] = useState("");
   const [mode, setMode] = useState<"code" | "geo">("code");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -33,7 +35,11 @@ export default function LandingPage() {
       await apiFetch(`/api/events/${match.id}/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: code.trim() }),
+        body: JSON.stringify({
+          code: code.trim(),
+          session_id: getSessionId(),
+          display_name: name.trim() || undefined,
+        }),
       });
 
       router.push(`/event/${match.id}`);
@@ -75,6 +81,8 @@ export default function LandingPage() {
                 body: JSON.stringify({
                   lat: pos.coords.latitude,
                   lng: pos.coords.longitude,
+                  session_id: getSessionId(),
+                  display_name: name.trim() || undefined,
                 }),
               });
               router.push(`/event/${ev.id}`);
@@ -124,6 +132,14 @@ export default function LandingPage() {
             My Location
           </button>
         </div>
+
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Your name (optional)"
+          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-sm placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-zinc-500 mb-4"
+        />
 
         {mode === "code" ? (
           <form onSubmit={handleCodeSubmit} className="space-y-4">

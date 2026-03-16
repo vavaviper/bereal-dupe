@@ -49,10 +49,13 @@ function CreateEventForm({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState("");
   const [accessType, setAccessType] = useState<"code" | "geo">("code");
   const [codeValue, setCodeValue] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [promptInterval, setPromptInterval] = useState("5");
   const [lat, setLat] = useState("");
   const [lng, setLng] = useState("");
   const [radius, setRadius] = useState("100");
   const [loading, setLoading] = useState(false);
+  const [createdEventId, setCreatedEventId] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -63,13 +66,21 @@ function CreateEventForm({ onCreated }: { onCreated: () => void }) {
           ? codeValue
           : { lat: Number(lat), lng: Number(lng), radius_meters: Number(radius) };
 
-      await apiFetch("/api/events", {
+      const created = await apiFetch<{ id: string }>("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, access_type: accessType, access_value }),
+        body: JSON.stringify({
+          name,
+          access_type: accessType,
+          access_value,
+          admin_password: adminPassword,
+          prompt_interval_minutes: Number(promptInterval),
+        }),
       });
+      setCreatedEventId(created.id);
       setName("");
       setCodeValue("");
+      setAdminPassword("");
       setLat("");
       setLng("");
       onCreated();
@@ -162,6 +173,29 @@ function CreateEventForm({ onCreated }: { onCreated: () => void }) {
         </div>
       )}
 
+      <input
+        type="password"
+        value={adminPassword}
+        onChange={(e) => setAdminPassword(e.target.value)}
+        placeholder="Admin password"
+        required
+        className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-500"
+      />
+
+      <div className="flex items-center gap-3">
+        <label className="text-sm text-zinc-400 whitespace-nowrap">
+          Prompt interval
+        </label>
+        <input
+          type="number"
+          value={promptInterval}
+          onChange={(e) => setPromptInterval(e.target.value)}
+          min="1"
+          className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-500"
+        />
+        <span className="text-sm text-zinc-500">min</span>
+      </div>
+
       <button
         type="submit"
         disabled={loading}
@@ -169,6 +203,18 @@ function CreateEventForm({ onCreated }: { onCreated: () => void }) {
       >
         {loading ? "Creating..." : "Create Event"}
       </button>
+
+      {createdEventId && (
+        <div className="rounded-lg bg-green-900/30 border border-green-700/50 p-4 text-sm">
+          <p className="text-green-300 font-medium mb-2">Event created!</p>
+          <a
+            href={`/admin/${createdEventId}`}
+            className="text-green-400 underline hover:text-green-300"
+          >
+            Open Admin Dashboard →
+          </a>
+        </div>
+      )}
     </form>
   );
 }
@@ -253,7 +299,16 @@ function EventCard({
           <span className="font-medium">{event.name}</span>
           <span className="ml-3 text-xs text-zinc-500">{accessDisplay}</span>
         </div>
-        <span className="text-zinc-500 text-sm">{expanded ? "▲" : "▼"}</span>
+        <div className="flex items-center gap-3">
+          <a
+            href={`/admin/${event.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-xs text-zinc-500 hover:text-zinc-300 underline"
+          >
+            Admin
+          </a>
+          <span className="text-zinc-500 text-sm">{expanded ? "▲" : "▼"}</span>
+        </div>
       </button>
 
       {expanded && (

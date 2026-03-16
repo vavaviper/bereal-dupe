@@ -3,6 +3,8 @@ export interface Event {
   name: string;
   access_type: "code" | "geo";
   access_value: string | { lat: number; lng: number; radius_meters: number };
+  prompt_interval_minutes: number;
+  created_at: string;
   active_prompt?: Prompt | null;
 }
 
@@ -22,4 +24,13 @@ export interface Submission {
   image_url: string;
   validated: boolean;
   submitted_at: string;
+}
+
+export interface Participant {
+  id: string;
+  event_id: string;
+  session_id: string;
+  display_name: string | null;
+  joined_at: string;
+  submission_count?: number;
 }

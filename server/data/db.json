@@ -8,6 +8,16 @@
       "prompts": [
         "prm-demo-1"
       ]
+    },
+    "2f0df4cc-3c1d-403b-ae57-4ce2b6fc76b0": {
+      "id": "2f0df4cc-3c1d-403b-ae57-4ce2b6fc76b0",
+      "name": "Socratica Symp 2026",
+      "access_type": "code",
+      "access_value": "6767",
+      "admin_password": "AdiBoss",
+      "prompt_interval_minutes": 15,
+      "created_at": "2026-03-16T23:27:17.751Z",
+      "prompts": []
     }
   },
   "prompts": {

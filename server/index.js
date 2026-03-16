@@ -30,16 +30,29 @@ const upload = multer({
 // ── Public routes ──────────────────────────────────────────────
 
 app.post("/api/events", (req, res) => {
-  const { name, access_type, access_value } = req.body;
+  const { name, access_type, access_value, admin_password, prompt_interval_minutes } = req.body;
   if (!name || !access_type || access_value == null) {
     return res.status(400).json({ error: "name, access_type, access_value required" });
+  }
+  if (!admin_password) {
+    return res.status(400).json({ error: "admin_password required" });
   }
   if (!["code", "geo"].includes(access_type)) {
     return res.status(400).json({ error: "access_type must be 'code' or 'geo'" });
   }
-  const event = { id: uuidv4(), name, access_type, access_value, prompts: [] };
+  const event = {
+    id: uuidv4(),
+    name,
+    access_type,
+    access_value,
+    admin_password,
+    prompt_interval_minutes: Number(prompt_interval_minutes) || 5,
+    created_at: new Date().toISOString(),
+    prompts: [],
+  };
   store.createEvent(event);
-  res.status(201).json(event);
+  const { admin_password: _, ...safeEvent } = event;
+  res.status(201).json(safeEvent);
 });
 
 app.get("/api/events/:id", (req, res) => {
@@ -53,9 +66,26 @@ app.post("/api/events/:id/verify", (req, res) => {
   const event = store.getEvent(req.params.id);
   if (!event) return res.status(404).json({ error: "event not found" });
 
+  function trackParticipant() {
+    const { session_id, display_name } = req.body;
+    if (session_id) {
+      const existing = store.getParticipantBySession(event.id, session_id);
+      if (!existing) {
+        store.createParticipant({
+          id: uuidv4(),
+          event_id: event.id,
+          session_id,
+          display_name: display_name || null,
+          joined_at: new Date().toISOString(),
+        });
+      }
+    }
+  }
+
   if (event.access_type === "code") {
     const { code } = req.body;
     if (code === event.access_value) {
+      trackParticipant();
       return res.json({ ok: true, event_id: event.id });
     }
     return res.status(403).json({ ok: false, error: "invalid code" });
@@ -69,6 +99,7 @@ app.post("/api/events/:id/verify", (req, res) => {
     const target = event.access_value;
     const dist = haversine(lat, lng, target.lat, target.lng);
     if (dist <= target.radius_meters) {
+      trackParticipant();
       return res.json({ ok: true, event_id: event.id });
     }
     return res.status(403).json({ ok: false, error: "outside event radius" });
@@ -181,6 +212,100 @@ app.post("/organizer/events/:id/prompts/:pid/end", (req, res) => {
   }
   const updated = store.updatePrompt(prompt.id, { active: false });
   res.json(updated);
+});
+
+// ── Admin routes ──────────────────────────────────────────────
+
+function checkAdmin(req, res) {
+  const event = store.getEvent(req.params.id);
+  if (!event) {
+    res.status(404).json({ error: "event not found" });
+    return null;
+  }
+  const password = req.headers["x-admin-password"];
+  if (!password || password !== event.admin_password) {
+    res.status(401).json({ error: "unauthorized" });
+    return null;
+  }
+  return event;
+}
+
+app.post("/api/events/:id/admin/login", (req, res) => {
+  const event = store.getEvent(req.params.id);
+  if (!event) return res.status(404).json({ error: "event not found" });
+  const { password } = req.body;
+  if (password !== event.admin_password) {
+    return res.status(401).json({ error: "invalid password" });
+  }
+  const { admin_password: _, ...safeEvent } = event;
+  res.json({ ok: true, event: safeEvent });
+});
+
+app.get("/api/events/:id/admin/dashboard", (req, res) => {
+  const event = checkAdmin(req, res);
+  if (!event) return;
+  const prompts = store.getPromptsByEvent(event.id);
+  const members = store.getParticipantsByEvent(event.id);
+  const submissions = store.getSubmissionsByEvent(event.id);
+  const { admin_password: _, ...safeEvent } = event;
+  res.json({ event: safeEvent, prompts, members, submissions });
+});
+
+app.put("/api/events/:id/admin/settings", (req, res) => {
+  const event = checkAdmin(req, res);
+  if (!event) return;
+  const { name, prompt_interval_minutes } = req.body;
+  const updates = {};
+  if (name) updates.name = name;
+  if (prompt_interval_minutes != null)
+    updates.prompt_interval_minutes = Number(prompt_interval_minutes);
+  const updated = store.updateEvent(event.id, updates);
+  const { admin_password: _, ...safeEvent } = updated;
+  res.json(safeEvent);
+});
+
+app.get("/api/events/:id/admin/members", (req, res) => {
+  const event = checkAdmin(req, res);
+  if (!event) return;
+  const members = store.getParticipantsByEvent(event.id);
+  const submissions = store.getSubmissionsByEvent(event.id);
+  const membersWithStats = members.map((m) => ({
+    ...m,
+    submission_count: submissions.filter(
+      (s) => s.user_session_id === m.session_id
+    ).length,
+  }));
+  res.json(membersWithStats);
+});
+
+app.delete("/api/events/:id/admin/members/:mid", (req, res) => {
+  const event = checkAdmin(req, res);
+  if (!event) return;
+  store.deleteParticipant(req.params.mid);
+  res.json({ ok: true });
+});
+
+app.delete("/api/events/:id/admin/prompts/:pid", (req, res) => {
+  const event = checkAdmin(req, res);
+  if (!event) return;
+  const prompt = store.getPrompt(req.params.pid);
+  if (!prompt || prompt.event_id !== event.id) {
+    return res.status(404).json({ error: "prompt not found" });
+  }
+  store.deletePrompt(prompt.id);
+  res.json({ ok: true });
+});
+
+app.get("/api/events/:id/admin/submissions", (req, res) => {
+  const event = checkAdmin(req, res);
+  if (!event) return;
+  const prompts = store.getPromptsByEvent(event.id);
+  const submissions = store.getSubmissionsByEvent(event.id);
+  const grouped = prompts.map((p) => ({
+    prompt: p,
+    submissions: submissions.filter((s) => s.prompt_id === p.id),
+  }));
+  res.json(grouped);
 });
 
 // ── Helpers ────────────────────────────────────────────────────
