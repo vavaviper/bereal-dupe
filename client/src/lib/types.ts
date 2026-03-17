@@ -3,6 +3,7 @@ export interface Event {
   name: string;
   access_type: "code" | "geo";
   access_value: string | { lat: number; lng: number; radius_meters: number };
+  visibility?: "public" | "private";
   active_prompt?: Prompt | null;
 }
 
