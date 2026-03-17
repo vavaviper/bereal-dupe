@@ -95,14 +95,36 @@ async function cycleToNextPrompt(eventId, currentPromptId) {
 
 function sanitizeEvent(event) {
   if (!event) return event;
-  const { admin_password, ...safe } = event;
+  const { admin_password, passcode, ...safe } = event;
   return safe;
 }
 
 // ── Public routes ──────────────────────────────────────────────
 
+app.get("/api/events/nearby", async (req, res) => {
+  const lat = parseFloat(req.query.lat);
+  const lng = parseFloat(req.query.lng);
+  if (isNaN(lat) || isNaN(lng)) {
+    return res.status(400).json({ error: "lat and lng query params required" });
+  }
+
+  const geoEvents = await store.getGeoEvents();
+  const results = [];
+  for (const ev of geoEvents) {
+    const target = ev.access_value;
+    const distance_meters = Math.round(
+      haversine(lat, lng, target.lat, target.lng)
+    );
+    const active_prompt = await store.getActivePrompt(ev.id);
+    results.push({ ...sanitizeEvent(ev), distance_meters, active_prompt });
+  }
+  results.sort((a, b) => a.distance_meters - b.distance_meters);
+
+  res.json(results);
+});
+
 app.post("/api/events", async (req, res) => {
-  const { name, access_type, access_value, admin_password, prompt_interval_minutes } = req.body;
+  const { name, access_type, access_value, admin_password, prompt_interval_minutes, visibility, passcode: eventPasscode } = req.body;
   if (!name || !access_type || access_value == null) {
     return res.status(400).json({ error: "name, access_type, access_value required" });
   }
@@ -120,6 +142,8 @@ app.post("/api/events", async (req, res) => {
     admin_password,
     prompt_interval_minutes: Number(prompt_interval_minutes) || 5,
     auto_cycle: false,
+    visibility: visibility || "public",
+    passcode: eventPasscode || null,
     created_at: new Date().toISOString(),
     prompts: [],
   };
@@ -164,17 +188,22 @@ app.post("/api/events/:id/verify", async (req, res) => {
   }
 
   if (event.access_type === "geo") {
-    const { lat, lng } = req.body;
+    const { lat, lng, passcode } = req.body;
     if (lat == null || lng == null) {
       return res.status(400).json({ error: "lat and lng required" });
     }
     const target = event.access_value;
     const dist = haversine(lat, lng, target.lat, target.lng);
-    if (dist <= target.radius_meters) {
-      await trackParticipant();
-      return res.json({ ok: true, event_id: event.id });
+    if (dist > target.radius_meters) {
+      return res.status(403).json({ ok: false, error: "outside event radius" });
     }
-    return res.status(403).json({ ok: false, error: "outside event radius" });
+    if (event.visibility === "private") {
+      if (!passcode || String(passcode).toUpperCase() !== String(event.passcode).toUpperCase()) {
+        return res.status(403).json({ ok: false, error: "invalid passcode" });
+      }
+    }
+    await trackParticipant();
+    return res.json({ ok: true, event_id: event.id });
   }
 });
 

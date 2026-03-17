@@ -25,6 +25,11 @@ async function updateEvent(id, updates) {
   return updated.val();
 }
 
+async function getGeoEvents() {
+  const events = await getEvents();
+  return events.filter((e) => e.access_type === "geo");
+}
+
 // ── Prompts ───────────────────────────────────────────────────
 
 async function getPromptsByEvent(eventId) {
@@ -162,6 +167,7 @@ module.exports = {
   getEvent,
   createEvent,
   updateEvent,
+  getGeoEvents,
   getPromptsByEvent,
   getPrompt,
   createPrompt,

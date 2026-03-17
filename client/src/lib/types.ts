@@ -6,6 +6,7 @@ export interface Event {
   prompt_interval_minutes: number;
   auto_cycle: boolean;
   created_at: string;
+  visibility?: "public" | "private";
   active_prompt?: Prompt | null;
 }
 
