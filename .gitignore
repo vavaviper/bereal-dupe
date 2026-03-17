@@ -1,11 +1,43 @@
-# dependencies
+# Dependencies
 node_modules/
 
-# env files
+# npm
+npm-debug.log*
+.npm
+package-lock.json.bak
+
+# Yarn
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.yarn/sdks
+yarn-debug.log*
+yarn-error.log*
+
+# pnpm
+.pnpm-debug.log*
+pnpm-lock.yaml.bak
+
+# Other
+.pnp
+.pnp.*
+.turbo
+.cache
+.parcel-cache
+lerna-debug.log*
+
+# Env and secrets
 .env
 .env.*
+!.env.example
 
-# data / uploads
+# Firebase / server secrets
+server/*-firebase-adminsdk-*.json
+server/service-account.json
+serviceAccountKey.json
+
+# Data / uploads
 server/data/db.json
 server/data/db.json.bak
 server/uploads/
@@ -14,10 +46,10 @@ server/uploads/
 .DS_Store
 Thumbs.db
 
-# logs
+# Debug
 *.log
-npm-debug.log*
+*.local
 
-# build output
+# Build output
 dist/
 build/
