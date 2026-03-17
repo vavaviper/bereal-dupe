@@ -1,4 +1,5 @@
 # Candid
+Demo: https://bereal-dupe.vercel.app/
 
 BeReal-style photo experience for private events. Organizers create events with access codes or geolocation locks, fire time-limited prompts, and attendees submit photos that appear on a live masonry canvas.
 
