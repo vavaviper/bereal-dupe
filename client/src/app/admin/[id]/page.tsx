@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { apiFetch, API_BASE } from "@/lib/api";
+import { apiFetch, API_BASE, submissionImageUrl } from "@/lib/api";
 import {
   setAdminPassword,
   getAdminPassword,
@@ -826,7 +826,7 @@ function SubmissionsTab({
               className="break-inside-avoid rounded-xl overflow-hidden bg-zinc-800/50 border border-zinc-700/50"
             >
               <img
-                src={`${API_BASE}${sub.image_url}`}
+                src={submissionImageUrl(sub.image_url)}
                 alt="Submission"
                 className="w-full object-cover"
                 loading="lazy"

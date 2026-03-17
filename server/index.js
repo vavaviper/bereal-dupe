@@ -6,6 +6,7 @@ const path = require("path");
 const { v4: uuidv4 } = require("uuid");
 const store = require("./data/store");
 const { validateImage } = require("./classify");
+const { uploadToUserUploads } = require("./firebase");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -247,17 +248,49 @@ app.post("/api/events/:id/submit", upload.single("image"), async (req, res) => {
 
   const result = await validateImage(req.file.path, activePrompt.text);
 
+  const ext = path.extname(req.file.originalname).slice(1) || "jpg";
+  const firebaseUrl = await uploadToUserUploads(req.file.path, req.params.id, ext);
+  const imageUrl = firebaseUrl || `/uploads/${req.file.filename}`;
+
   const submission = {
     id: uuidv4(),
     prompt_id: activePrompt.id,
     user_session_id,
-    image_url: `/uploads/${req.file.filename}`,
+    image_url: imageUrl,
     validated: result.valid,
     confidence: result.confidence,
     submitted_at: new Date().toISOString(),
   };
   await store.createSubmission(submission);
   res.status(201).json(submission);
+});
+
+// ── Image proxy (avoids CORS/referrer issues for Firebase Storage) ────────
+
+app.get("/api/image-proxy", async (req, res) => {
+  const raw = req.query.url;
+  if (!raw || typeof raw !== "string") {
+    return res.status(400).send("Missing url query");
+  }
+  const url = decodeURIComponent(raw.trim());
+  const allowed =
+    url.startsWith("https://firebasestorage.googleapis.com/") ||
+    url.startsWith("https://storage.googleapis.com/");
+  if (!allowed) {
+    return res.status(400).send("URL not allowed");
+  }
+  try {
+    const resp = await fetch(url, { headers: { Accept: "image/*" } });
+    if (!resp.ok) throw new Error(resp.statusText);
+    const contentType = resp.headers.get("content-type") || "image/jpeg";
+    const buffer = Buffer.from(await resp.arrayBuffer());
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(buffer);
+  } catch (err) {
+    console.warn("Image proxy error:", err.message);
+    res.status(502).send("Failed to fetch image");
+  }
 });
 
 // ── Leaderboard ────────────────────────────────────────────────

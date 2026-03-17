@@ -1,0 +1,23 @@
+{
+  "rules": {
+    "events": {
+      ".read": "true",
+      ".write": "true"
+    },
+    "prompts": {
+      ".indexOn": ["event_id"],
+      ".read": "true",
+      ".write": "true"
+    },
+    "submissions": {
+      ".indexOn": ["prompt_id"],
+      ".read": "true",
+      ".write": "true"
+    },
+    "participants": {
+      ".indexOn": ["event_id"],
+      ".read": "true",
+      ".write": "true"
+    }
+  }
+}

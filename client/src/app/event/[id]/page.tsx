@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { apiFetch, API_BASE } from "@/lib/api";
+import { apiFetch, submissionImageUrl } from "@/lib/api";
 import type { Event, Prompt, Submission } from "@/lib/types";
 import Countdown from "@/components/Countdown";
 
@@ -106,12 +106,18 @@ export default function CanvasPage() {
             key={sub.id}
             className="break-inside-avoid rounded-xl overflow-hidden bg-zinc-800/50 border border-zinc-700/50"
           >
-            <div className="relative">
+            <div className="relative min-h-[120px] bg-zinc-800">
               <img
-                src={`${API_BASE}${sub.image_url}`}
+                src={submissionImageUrl(sub.image_url)}
                 alt="Submission"
-                className="w-full object-cover"
+                className="w-full object-cover min-h-[120px]"
                 loading="lazy"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  el.onerror = null;
+                  el.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' viewBox='0 0 200 200'%3E%3Crect fill='%233f3f46' width='200' height='200'/%3E%3Ctext x='50%25' y='50%25' fill='%2371717a' font-size='14' text-anchor='middle' dy='.3em'%3EImage unavailable%3C/text%3E%3C/svg%3E";
+                }}
               />
               <span
                 className={`absolute top-2 right-2 text-xs font-medium px-2 py-1 rounded-full ${
