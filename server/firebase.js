@@ -2,20 +2,27 @@ const admin = require("firebase-admin");
 const fs = require("fs");
 const path = require("path");
 
-const credPath =
-  process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
-  process.env.GOOGLE_APPLICATION_CREDENTIALS;
-const resolved = credPath
-  ? path.isAbsolute(credPath)
-    ? credPath
-    : path.resolve(process.cwd(), credPath)
-  : path.join(__dirname, "bereal-dupe-firebase-adminsdk-fbsvc-d134b29a7e.json");
+let serviceAccount;
 
-if (!fs.existsSync(resolved)) {
-  throw new Error(`Firebase service account key not found at ${resolved}. Set FIREBASE_SERVICE_ACCOUNT_PATH in .env`);
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} else {
+  const credPath =
+    process.env.FIREBASE_SERVICE_ACCOUNT_PATH ||
+    process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  const resolved = credPath
+    ? path.isAbsolute(credPath)
+      ? credPath
+      : path.resolve(process.cwd(), credPath)
+    : path.join(__dirname, "serviceAccountKey.json");
+
+  if (!fs.existsSync(resolved)) {
+    throw new Error(
+      `Firebase service account key not found. Set FIREBASE_SERVICE_ACCOUNT env var (JSON string) or FIREBASE_SERVICE_ACCOUNT_PATH.`
+    );
+  }
+  serviceAccount = JSON.parse(fs.readFileSync(resolved, "utf8"));
 }
-
-const serviceAccount = JSON.parse(fs.readFileSync(resolved, "utf8"));
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
