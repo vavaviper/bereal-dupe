@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import { getSessionId } from "@/lib/session";
 
@@ -151,6 +152,12 @@ export default function LandingPage() {
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold tracking-tight">Candid</h1>
           <p className="text-zinc-400 mt-2">Join a live photo event</p>
+          <Link
+            href="/organizer"
+            className="inline-block mt-4 text-sm text-zinc-500 hover:text-white underline underline-offset-2 transition-colors"
+          >
+            Create event
+          </Link>
         </div>
 
         <div className="flex rounded-lg bg-zinc-800 p-1 mb-6">
