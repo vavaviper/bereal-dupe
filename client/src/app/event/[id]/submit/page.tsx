@@ -6,6 +6,7 @@ import { apiFetch, API_BASE } from "@/lib/api";
 import { getSessionId } from "@/lib/session";
 import type { Event, Prompt, Submission } from "@/lib/types";
 import Countdown from "@/components/Countdown";
+import DualCamera from "@/components/DualCamera";
 
 export default function SubmitPage() {
   const { id } = useParams<{ id: string }>();
@@ -18,6 +19,7 @@ export default function SubmitPage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<Submission | null>(null);
   const [loading, setLoading] = useState(true);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   const fetchEvent = useCallback(async () => {
     try {
@@ -35,12 +37,25 @@ export default function SubmitPage() {
     fetchEvent();
   }, [fetchEvent]);
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
     setFile(f);
     setPreview(URL.createObjectURL(f));
     setResult(null);
+  }
+
+  function handleCameraCapture(mergedFile: File, previewUrl: string) {
+    setFile(mergedFile);
+    setPreview(previewUrl);
+    setCameraOpen(false);
+    setResult(null);
+  }
+
+  function clearPhoto() {
+    setFile(null);
+    if (preview) URL.revokeObjectURL(preview);
+    setPreview(null);
   }
 
   async function handleSubmit() {
@@ -88,6 +103,15 @@ export default function SubmitPage() {
           Back to event
         </button>
       </main>
+    );
+  }
+
+  if (cameraOpen) {
+    return (
+      <DualCamera
+        onCapture={handleCameraCapture}
+        onCancel={() => setCameraOpen(false)}
+      />
     );
   }
 
@@ -144,27 +168,42 @@ export default function SubmitPage() {
           <div className="relative rounded-xl overflow-hidden border border-zinc-700">
             <img src={preview} alt="Preview" className="w-full object-cover max-h-96" />
             <button
-              onClick={() => {
-                setFile(null);
-                setPreview(null);
-              }}
+              onClick={clearPhoto}
               className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm hover:bg-black/80"
             >
               ✕
             </button>
           </div>
         ) : (
-          <label className="flex flex-col items-center justify-center border-2 border-dashed border-zinc-700 rounded-xl p-12 cursor-pointer hover:border-zinc-500 transition-colors">
-            <div className="text-4xl mb-2">📸</div>
-            <span className="text-zinc-400 text-sm">Tap to take a photo or choose one</span>
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleFile}
-              className="hidden"
-            />
-          </label>
+          <div className="space-y-3">
+            {/* Primary: BeReal-style dual camera */}
+            <button
+              onClick={() => setCameraOpen(true)}
+              className="w-full flex flex-col items-center justify-center border-2 border-dashed border-zinc-600 rounded-xl p-10 cursor-pointer hover:border-zinc-400 transition-colors bg-zinc-800/40"
+            >
+              <div className="relative mb-3">
+                <div className="text-5xl">📸</div>
+                <div className="absolute -top-1 -right-3 text-lg">🤳</div>
+              </div>
+              <span className="text-white font-medium text-sm">Take a Candid</span>
+              <span className="text-zinc-500 text-xs mt-1">Front + back camera, BeReal style</span>
+            </button>
+
+            {/* Secondary: regular file upload fallback */}
+            <label className="flex items-center justify-center gap-2 text-zinc-500 text-xs cursor-pointer hover:text-zinc-300 transition-colors py-2">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                <path d="M9.25 13.25a.75.75 0 0 0 1.5 0V4.636l2.955 3.129a.75.75 0 0 0 1.09-1.03l-4.25-4.5a.75.75 0 0 0-1.09 0l-4.25 4.5a.75.75 0 1 0 1.09 1.03L9.25 4.636v8.614Z" />
+                <path d="M3.5 12.75a.75.75 0 0 0-1.5 0v2.5A2.75 2.75 0 0 0 4.75 18h10.5A2.75 2.75 0 0 0 18 15.25v-2.5a.75.75 0 0 0-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5Z" />
+              </svg>
+              Or upload a photo from gallery
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </label>
+          </div>
         )}
 
         {error && (

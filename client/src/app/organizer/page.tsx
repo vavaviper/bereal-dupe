@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 import type { Event, Prompt } from "@/lib/types";
 
@@ -19,6 +20,15 @@ export default function OrganizerPage() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-8">
+      <Link
+        href="/"
+        className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-white mb-6 transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+          <path fillRule="evenodd" d="M17 10a.75.75 0 0 1-.75.75H5.612l4.158 3.96a.75.75 0 1 1-1.04 1.08l-5.5-5.25a.75.75 0 0 1 0-1.08l5.5-5.25a.75.75 0 1 1 1.04 1.08L5.612 9.25H16.25A.75.75 0 0 1 17 10Z" clipRule="evenodd" />
+        </svg>
+        Back to join events
+      </Link>
       <h1 className="text-2xl font-bold tracking-tight mb-6">Organizer Dashboard</h1>
 
       <CreateEventForm onCreated={refresh} />
