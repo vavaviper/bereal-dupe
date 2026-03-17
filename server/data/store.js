@@ -40,6 +40,10 @@ function createEvent(event) {
   return event;
 }
 
+function getGeoEvents() {
+  return Object.values(load().events).filter((e) => e.access_type === "geo");
+}
+
 // ── Prompts ────────────────────────────────────────────────────
 
 function getPromptsByEvent(eventId) {
@@ -135,6 +139,7 @@ module.exports = {
   getEvents,
   getEvent,
   createEvent,
+  getGeoEvents,
   getPromptsByEvent,
   getPrompt,
   createPrompt,

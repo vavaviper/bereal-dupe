@@ -30,6 +30,29 @@ const upload = multer({
 
 // ── Public routes ──────────────────────────────────────────────
 
+app.get("/api/events/nearby", (req, res) => {
+  const lat = parseFloat(req.query.lat);
+  const lng = parseFloat(req.query.lng);
+  if (isNaN(lat) || isNaN(lng)) {
+    return res.status(400).json({ error: "lat and lng query params required" });
+  }
+
+  const geoEvents = store.getGeoEvents();
+  const results = geoEvents
+    .map((ev) => {
+      const target = ev.access_value;
+      const distance_meters = Math.round(
+        haversine(lat, lng, target.lat, target.lng)
+      );
+      const active_prompt = store.getActivePrompt(ev.id);
+      const { passcode, ...safe } = ev;
+      return { ...safe, distance_meters, active_prompt };
+    })
+    .sort((a, b) => a.distance_meters - b.distance_meters);
+
+  res.json(results);
+});
+
 app.post("/api/events", (req, res) => {
   const { name, access_type, access_value } = req.body;
   if (!name || !access_type || access_value == null) {
@@ -47,7 +70,8 @@ app.get("/api/events/:id", (req, res) => {
   const event = store.getEvent(req.params.id);
   if (!event) return res.status(404).json({ error: "event not found" });
   const activePrompt = store.getActivePrompt(event.id);
-  res.json({ ...event, active_prompt: activePrompt });
+  const { passcode, ...safe } = event;
+  res.json({ ...safe, active_prompt: activePrompt });
 });
 
 app.post("/api/events/:id/verify", (req, res) => {
@@ -63,16 +87,21 @@ app.post("/api/events/:id/verify", (req, res) => {
   }
 
   if (event.access_type === "geo") {
-    const { lat, lng } = req.body;
+    const { lat, lng, passcode } = req.body;
     if (lat == null || lng == null) {
       return res.status(400).json({ error: "lat and lng required" });
     }
     const target = event.access_value;
     const dist = haversine(lat, lng, target.lat, target.lng);
-    if (dist <= target.radius_meters) {
-      return res.json({ ok: true, event_id: event.id });
+    if (dist > target.radius_meters) {
+      return res.status(403).json({ ok: false, error: "outside event radius" });
     }
-    return res.status(403).json({ ok: false, error: "outside event radius" });
+    if (event.visibility === "private") {
+      if (!passcode || String(passcode).toUpperCase() !== String(event.passcode).toUpperCase()) {
+        return res.status(403).json({ ok: false, error: "invalid passcode" });
+      }
+    }
+    return res.json({ ok: true, event_id: event.id });
   }
 });
 
