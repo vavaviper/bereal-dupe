@@ -4,6 +4,7 @@ export interface Event {
   access_type: "code" | "geo";
   access_value: string | { lat: number; lng: number; radius_meters: number };
   prompt_interval_minutes: number;
+  auto_cycle: boolean;
   created_at: string;
   active_prompt?: Prompt | null;
 }
@@ -15,6 +16,7 @@ export interface Prompt {
   fired_at: string | null;
   duration_seconds: number;
   active: boolean;
+  created_at?: string;
 }
 
 export interface Submission {

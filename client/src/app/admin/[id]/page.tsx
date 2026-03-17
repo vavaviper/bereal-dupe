@@ -227,6 +227,7 @@ function OverviewTab({
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(event.name);
   const [interval, setInterval] = useState(String(event.prompt_interval_minutes));
+  const [autoCycle, setAutoCycle] = useState(event.auto_cycle);
   const [saving, setSaving] = useState(false);
 
   async function saveName() {
@@ -249,6 +250,17 @@ function OverviewTab({
       body: JSON.stringify({ prompt_interval_minutes: Number(interval) }),
     });
     setSaving(false);
+    onUpdate();
+  }
+
+  async function toggleAutoCycle() {
+    const newValue = !autoCycle;
+    setAutoCycle(newValue);
+    await adminFetch(eventId, `/api/events/${eventId}/admin/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ auto_cycle: newValue }),
+    });
     onUpdate();
   }
 
@@ -419,6 +431,36 @@ function OverviewTab({
           )}
         </div>
 
+        {/* Auto-cycle toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-sm text-zinc-400">Auto-cycle prompts</span>
+            <p className="text-xs text-zinc-600 mt-0.5">
+              Automatically fire the next prompt when the current one expires
+            </p>
+          </div>
+          <button
+            onClick={toggleAutoCycle}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              autoCycle ? "bg-green-600" : "bg-zinc-700"
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                autoCycle ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+        </div>
+
+        {autoCycle && (
+          <div className="rounded-lg bg-green-900/20 border border-green-700/40 px-3 py-2">
+            <p className="text-xs text-green-400">
+              Auto-cycle is active. Prompts will fire in order automatically when each one expires.
+            </p>
+          </div>
+        )}
+
         {nextPromptIn && (
           <div className="flex items-center gap-2">
             <span className="text-sm text-zinc-400">Next prompt suggested in</span>
@@ -573,12 +615,16 @@ function PromptsTab({
     onUpdate();
   }
 
-  // Sort: active first, then by creation
-  const sorted = [...prompts].sort((a, b) => {
-    if (a.active && !b.active) return -1;
-    if (!a.active && b.active) return 1;
-    return 0;
-  });
+  // Sort by creation order (matters for auto-cycle)
+  const sorted = [...prompts].sort(
+    (a, b) =>
+      new Date(a.created_at || 0).getTime() -
+      new Date(b.created_at || 0).getTime()
+  );
+
+  // Find the "next up" prompt for auto-cycle
+  const activeIndex = sorted.findIndex((p) => p.active);
+  const nextUpIndex = activeIndex >= 0 ? activeIndex + 1 : -1;
 
   return (
     <div className="space-y-6">
@@ -625,17 +671,32 @@ function PromptsTab({
         </p>
       )}
 
+      {event.auto_cycle && sorted.length > 0 && (
+        <div className="rounded-lg bg-zinc-800/60 border border-zinc-700/50 px-4 py-2.5 flex items-center gap-2">
+          <span className="text-xs text-zinc-500">
+            Auto-cycle order: prompts will fire top-to-bottom
+          </span>
+        </div>
+      )}
+
       <div className="space-y-2">
-        {sorted.map((p) => (
+        {sorted.map((p, i) => {
+          const isNextUp = event.auto_cycle && i === nextUpIndex;
+          return (
           <div
             key={p.id}
             className={`rounded-lg px-4 py-3 flex items-center justify-between gap-3 ${
               p.active
                 ? "bg-green-900/20 border border-green-700/50"
+                : isNextUp
+                ? "bg-yellow-900/15 border border-yellow-700/40"
                 : "bg-zinc-800/60 border border-zinc-700/50"
             }`}
           >
             <div className="flex-1 min-w-0">
+              <span className="text-xs text-zinc-600 mr-2 font-mono">
+                #{i + 1}
+              </span>
               <span className="text-sm font-medium">{p.text}</span>
               <span className="text-xs text-zinc-500 ml-2">
                 {p.duration_seconds}s
@@ -643,6 +704,11 @@ function PromptsTab({
               {p.active && (
                 <span className="ml-2 text-xs text-green-400 font-medium">
                   LIVE
+                </span>
+              )}
+              {isNextUp && (
+                <span className="ml-2 text-xs text-yellow-400 font-medium">
+                  NEXT UP
                 </span>
               )}
               {p.active && p.fired_at && (
@@ -686,7 +752,8 @@ function PromptsTab({
               </button>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

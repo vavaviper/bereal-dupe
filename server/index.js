@@ -27,9 +27,81 @@ const upload = multer({
   },
 });
 
+// ── Auto-cycle scheduler ──────────────────────────────────────
+
+const scheduledCycles = new Map(); // eventId -> timeoutId
+
+async function scheduleNextPrompt(eventId) {
+  clearScheduledCycle(eventId);
+
+  const event = await store.getEvent(eventId);
+  if (!event || !event.auto_cycle) return;
+
+  const activePrompt = await store.getActivePrompt(eventId);
+  if (!activePrompt || !activePrompt.fired_at) return;
+
+  const elapsed =
+    (Date.now() - new Date(activePrompt.fired_at).getTime()) / 1000;
+  const remaining = activePrompt.duration_seconds - elapsed;
+
+  if (remaining <= 0) {
+    await cycleToNextPrompt(eventId, activePrompt.id);
+    return;
+  }
+
+  const timeoutId = setTimeout(async () => {
+    await cycleToNextPrompt(eventId, activePrompt.id);
+  }, remaining * 1000);
+
+  scheduledCycles.set(eventId, timeoutId);
+}
+
+function clearScheduledCycle(eventId) {
+  const existing = scheduledCycles.get(eventId);
+  if (existing) {
+    clearTimeout(existing);
+    scheduledCycles.delete(eventId);
+  }
+}
+
+async function cycleToNextPrompt(eventId, currentPromptId) {
+  scheduledCycles.delete(eventId);
+
+  const event = await store.getEvent(eventId);
+  if (!event || !event.auto_cycle) return;
+
+  await store.updatePrompt(currentPromptId, { active: false });
+
+  const prompts = (await store.getPromptsByEvent(eventId)).sort(
+    (a, b) =>
+      new Date(a.created_at || 0).getTime() -
+      new Date(b.created_at || 0).getTime()
+  );
+
+  const currentIndex = prompts.findIndex((p) => p.id === currentPromptId);
+  const nextPrompt = prompts[currentIndex + 1];
+
+  if (nextPrompt) {
+    await store.updatePrompt(nextPrompt.id, {
+      fired_at: new Date().toISOString(),
+      active: true,
+    });
+    await scheduleNextPrompt(eventId);
+  }
+  // If no next prompt, auto-cycle stops naturally
+}
+
+// ── Helper to strip sensitive fields ──────────────────────────
+
+function sanitizeEvent(event) {
+  if (!event) return event;
+  const { admin_password, ...safe } = event;
+  return safe;
+}
+
 // ── Public routes ──────────────────────────────────────────────
 
-app.post("/api/events", (req, res) => {
+app.post("/api/events", async (req, res) => {
   const { name, access_type, access_value, admin_password, prompt_interval_minutes } = req.body;
   if (!name || !access_type || access_value == null) {
     return res.status(400).json({ error: "name, access_type, access_value required" });
@@ -47,31 +119,31 @@ app.post("/api/events", (req, res) => {
     access_value,
     admin_password,
     prompt_interval_minutes: Number(prompt_interval_minutes) || 5,
+    auto_cycle: false,
     created_at: new Date().toISOString(),
     prompts: [],
   };
-  store.createEvent(event);
-  const { admin_password: _, ...safeEvent } = event;
-  res.status(201).json(safeEvent);
+  await store.createEvent(event);
+  res.status(201).json(sanitizeEvent(event));
 });
 
-app.get("/api/events/:id", (req, res) => {
-  const event = store.getEvent(req.params.id);
+app.get("/api/events/:id", async (req, res) => {
+  const event = await store.getEvent(req.params.id);
   if (!event) return res.status(404).json({ error: "event not found" });
-  const activePrompt = store.getActivePrompt(event.id);
-  res.json({ ...event, active_prompt: activePrompt });
+  const activePrompt = await store.getActivePrompt(event.id);
+  res.json({ ...sanitizeEvent(event), active_prompt: activePrompt });
 });
 
-app.post("/api/events/:id/verify", (req, res) => {
-  const event = store.getEvent(req.params.id);
+app.post("/api/events/:id/verify", async (req, res) => {
+  const event = await store.getEvent(req.params.id);
   if (!event) return res.status(404).json({ error: "event not found" });
 
-  function trackParticipant() {
+  async function trackParticipant() {
     const { session_id, display_name } = req.body;
     if (session_id) {
-      const existing = store.getParticipantBySession(event.id, session_id);
+      const existing = await store.getParticipantBySession(event.id, session_id);
       if (!existing) {
-        store.createParticipant({
+        await store.createParticipant({
           id: uuidv4(),
           event_id: event.id,
           session_id,
@@ -85,7 +157,7 @@ app.post("/api/events/:id/verify", (req, res) => {
   if (event.access_type === "code") {
     const { code } = req.body;
     if (code === event.access_value) {
-      trackParticipant();
+      await trackParticipant();
       return res.json({ ok: true, event_id: event.id });
     }
     return res.status(403).json({ ok: false, error: "invalid code" });
@@ -99,29 +171,29 @@ app.post("/api/events/:id/verify", (req, res) => {
     const target = event.access_value;
     const dist = haversine(lat, lng, target.lat, target.lng);
     if (dist <= target.radius_meters) {
-      trackParticipant();
+      await trackParticipant();
       return res.json({ ok: true, event_id: event.id });
     }
     return res.status(403).json({ ok: false, error: "outside event radius" });
   }
 });
 
-app.get("/api/events/:id/submissions", (req, res) => {
-  const event = store.getEvent(req.params.id);
+app.get("/api/events/:id/submissions", async (req, res) => {
+  const event = await store.getEvent(req.params.id);
   if (!event) return res.status(404).json({ error: "event not found" });
-  const activePrompt = store.getActivePrompt(event.id);
+  const activePrompt = await store.getActivePrompt(event.id);
   if (!activePrompt) return res.json({ submissions: [], prompt: null });
-  const subs = store
-    .getSubmissionsByPrompt(activePrompt.id)
-    .filter((s) => s.validated);
+  const subs = (await store.getSubmissionsByPrompt(activePrompt.id)).filter(
+    (s) => s.validated
+  );
   res.json({ submissions: subs, prompt: activePrompt });
 });
 
 app.post("/api/events/:id/submit", upload.single("image"), async (req, res) => {
-  const event = store.getEvent(req.params.id);
+  const event = await store.getEvent(req.params.id);
   if (!event) return res.status(404).json({ error: "event not found" });
 
-  const activePrompt = store.getActivePrompt(event.id);
+  const activePrompt = await store.getActivePrompt(event.id);
   if (!activePrompt) {
     return res.status(400).json({ error: "no active prompt" });
   }
@@ -131,7 +203,7 @@ app.post("/api/events/:id/submit", upload.single("image"), async (req, res) => {
     return res.status(400).json({ error: "user_session_id required" });
   }
 
-  const existing = store.getSubmissionBySession(activePrompt.id, user_session_id);
+  const existing = await store.getSubmissionBySession(activePrompt.id, user_session_id);
   if (existing) {
     return res.status(409).json({ error: "already submitted for this prompt" });
   }
@@ -150,24 +222,25 @@ app.post("/api/events/:id/submit", upload.single("image"), async (req, res) => {
     validated: result.valid,
     submitted_at: new Date().toISOString(),
   };
-  store.createSubmission(submission);
+  await store.createSubmission(submission);
   res.status(201).json(submission);
 });
 
 // ── Organizer routes ───────────────────────────────────────────
 
-app.get("/organizer/events", (_req, res) => {
-  res.json(store.getEvents());
+app.get("/organizer/events", async (_req, res) => {
+  const events = await store.getEvents();
+  res.json(events.map(sanitizeEvent));
 });
 
-app.get("/organizer/events/:id/prompts", (req, res) => {
-  const event = store.getEvent(req.params.id);
+app.get("/organizer/events/:id/prompts", async (req, res) => {
+  const event = await store.getEvent(req.params.id);
   if (!event) return res.status(404).json({ error: "event not found" });
-  res.json(store.getPromptsByEvent(event.id));
+  res.json(await store.getPromptsByEvent(event.id));
 });
 
-app.post("/organizer/events/:id/prompts", (req, res) => {
-  const event = store.getEvent(req.params.id);
+app.post("/organizer/events/:id/prompts", async (req, res) => {
+  const event = await store.getEvent(req.params.id);
   if (!event) return res.status(404).json({ error: "event not found" });
 
   const { text, duration_seconds } = req.body;
@@ -182,42 +255,45 @@ app.post("/organizer/events/:id/prompts", (req, res) => {
     fired_at: null,
     duration_seconds: Number(duration_seconds),
     active: false,
+    created_at: new Date().toISOString(),
   };
-  store.createPrompt(prompt);
+  await store.createPrompt(prompt);
   res.status(201).json(prompt);
 });
 
-app.post("/organizer/events/:id/prompts/:pid/fire", (req, res) => {
-  const prompt = store.getPrompt(req.params.pid);
+app.post("/organizer/events/:id/prompts/:pid/fire", async (req, res) => {
+  const prompt = await store.getPrompt(req.params.pid);
   if (!prompt || prompt.event_id !== req.params.id) {
     return res.status(404).json({ error: "prompt not found" });
   }
 
-  const currentActive = store.getActivePrompt(req.params.id);
+  const currentActive = await store.getActivePrompt(req.params.id);
   if (currentActive && currentActive.id !== prompt.id) {
-    store.updatePrompt(currentActive.id, { active: false });
+    await store.updatePrompt(currentActive.id, { active: false });
   }
 
-  const updated = store.updatePrompt(prompt.id, {
+  const updated = await store.updatePrompt(prompt.id, {
     fired_at: new Date().toISOString(),
     active: true,
   });
+  await scheduleNextPrompt(req.params.id);
   res.json(updated);
 });
 
-app.post("/organizer/events/:id/prompts/:pid/end", (req, res) => {
-  const prompt = store.getPrompt(req.params.pid);
+app.post("/organizer/events/:id/prompts/:pid/end", async (req, res) => {
+  const prompt = await store.getPrompt(req.params.pid);
   if (!prompt || prompt.event_id !== req.params.id) {
     return res.status(404).json({ error: "prompt not found" });
   }
-  const updated = store.updatePrompt(prompt.id, { active: false });
+  clearScheduledCycle(req.params.id);
+  const updated = await store.updatePrompt(prompt.id, { active: false });
   res.json(updated);
 });
 
 // ── Admin routes ──────────────────────────────────────────────
 
-function checkAdmin(req, res) {
-  const event = store.getEvent(req.params.id);
+async function checkAdmin(req, res) {
+  const event = await store.getEvent(req.params.id);
   if (!event) {
     res.status(404).json({ error: "event not found" });
     return null;
@@ -230,45 +306,50 @@ function checkAdmin(req, res) {
   return event;
 }
 
-app.post("/api/events/:id/admin/login", (req, res) => {
-  const event = store.getEvent(req.params.id);
+app.post("/api/events/:id/admin/login", async (req, res) => {
+  const event = await store.getEvent(req.params.id);
   if (!event) return res.status(404).json({ error: "event not found" });
   const { password } = req.body;
   if (password !== event.admin_password) {
     return res.status(401).json({ error: "invalid password" });
   }
-  const { admin_password: _, ...safeEvent } = event;
-  res.json({ ok: true, event: safeEvent });
+  res.json({ ok: true, event: sanitizeEvent(event) });
 });
 
-app.get("/api/events/:id/admin/dashboard", (req, res) => {
-  const event = checkAdmin(req, res);
+app.get("/api/events/:id/admin/dashboard", async (req, res) => {
+  const event = await checkAdmin(req, res);
   if (!event) return;
-  const prompts = store.getPromptsByEvent(event.id);
-  const members = store.getParticipantsByEvent(event.id);
-  const submissions = store.getSubmissionsByEvent(event.id);
-  const { admin_password: _, ...safeEvent } = event;
-  res.json({ event: safeEvent, prompts, members, submissions });
+  const prompts = await store.getPromptsByEvent(event.id);
+  const members = await store.getParticipantsByEvent(event.id);
+  const submissions = await store.getSubmissionsByEvent(event.id);
+  res.json({ event: sanitizeEvent(event), prompts, members, submissions });
 });
 
-app.put("/api/events/:id/admin/settings", (req, res) => {
-  const event = checkAdmin(req, res);
+app.put("/api/events/:id/admin/settings", async (req, res) => {
+  const event = await checkAdmin(req, res);
   if (!event) return;
-  const { name, prompt_interval_minutes } = req.body;
+  const { name, prompt_interval_minutes, auto_cycle } = req.body;
   const updates = {};
   if (name) updates.name = name;
   if (prompt_interval_minutes != null)
     updates.prompt_interval_minutes = Number(prompt_interval_minutes);
-  const updated = store.updateEvent(event.id, updates);
-  const { admin_password: _, ...safeEvent } = updated;
-  res.json(safeEvent);
+  if (auto_cycle != null) updates.auto_cycle = Boolean(auto_cycle);
+  const updated = await store.updateEvent(event.id, updates);
+
+  if (auto_cycle === true) {
+    await scheduleNextPrompt(event.id);
+  } else if (auto_cycle === false) {
+    clearScheduledCycle(event.id);
+  }
+
+  res.json(sanitizeEvent(updated));
 });
 
-app.get("/api/events/:id/admin/members", (req, res) => {
-  const event = checkAdmin(req, res);
+app.get("/api/events/:id/admin/members", async (req, res) => {
+  const event = await checkAdmin(req, res);
   if (!event) return;
-  const members = store.getParticipantsByEvent(event.id);
-  const submissions = store.getSubmissionsByEvent(event.id);
+  const members = await store.getParticipantsByEvent(event.id);
+  const submissions = await store.getSubmissionsByEvent(event.id);
   const membersWithStats = members.map((m) => ({
     ...m,
     submission_count: submissions.filter(
@@ -278,29 +359,29 @@ app.get("/api/events/:id/admin/members", (req, res) => {
   res.json(membersWithStats);
 });
 
-app.delete("/api/events/:id/admin/members/:mid", (req, res) => {
-  const event = checkAdmin(req, res);
+app.delete("/api/events/:id/admin/members/:mid", async (req, res) => {
+  const event = await checkAdmin(req, res);
   if (!event) return;
-  store.deleteParticipant(req.params.mid);
+  await store.deleteParticipant(req.params.mid);
   res.json({ ok: true });
 });
 
-app.delete("/api/events/:id/admin/prompts/:pid", (req, res) => {
-  const event = checkAdmin(req, res);
+app.delete("/api/events/:id/admin/prompts/:pid", async (req, res) => {
+  const event = await checkAdmin(req, res);
   if (!event) return;
-  const prompt = store.getPrompt(req.params.pid);
+  const prompt = await store.getPrompt(req.params.pid);
   if (!prompt || prompt.event_id !== event.id) {
     return res.status(404).json({ error: "prompt not found" });
   }
-  store.deletePrompt(prompt.id);
+  await store.deletePrompt(prompt.id);
   res.json({ ok: true });
 });
 
-app.get("/api/events/:id/admin/submissions", (req, res) => {
-  const event = checkAdmin(req, res);
+app.get("/api/events/:id/admin/submissions", async (req, res) => {
+  const event = await checkAdmin(req, res);
   if (!event) return;
-  const prompts = store.getPromptsByEvent(event.id);
-  const submissions = store.getSubmissionsByEvent(event.id);
+  const prompts = await store.getPromptsByEvent(event.id);
+  const submissions = await store.getSubmissionsByEvent(event.id);
   const grouped = prompts.map((p) => ({
     prompt: p,
     submissions: submissions.filter((s) => s.prompt_id === p.id),

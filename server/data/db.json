@@ -28,6 +28,22 @@
       "fired_at": "2026-03-16T20:00:00.000Z",
       "duration_seconds": 300,
       "active": true
+    },
+    "0537f9b7-9c07-4744-9360-0241805f8e34": {
+      "id": "0537f9b7-9c07-4744-9360-0241805f8e34",
+      "event_id": "2f0df4cc-3c1d-403b-ae57-4ce2b6fc76b0",
+      "text": "Photograph Varsha",
+      "fired_at": "2026-03-17T00:07:06.157Z",
+      "duration_seconds": 500,
+      "active": false
+    },
+    "c800af7f-a75a-4c45-8c1f-4135be63709e": {
+      "id": "c800af7f-a75a-4c45-8c1f-4135be63709e",
+      "event_id": "2f0df4cc-3c1d-403b-ae57-4ce2b6fc76b0",
+      "text": "Take picture of Neiloy",
+      "fired_at": "2026-03-17T00:07:00.799Z",
+      "duration_seconds": 120,
+      "active": false
     }
   },
   "submissions": {
@@ -94,6 +110,24 @@
       "image_url": "https://firebasestorage.googleapis.com/v0/b/bereal-dupe.firebasestorage.app/o/images%2Fuser_uploads%2Fevt-demo-123%2F5f7c313f-6aab-4142-a16f-53b4b21b2399.png?alt=media&token=517899d6-bf53-44bd-9c7a-91d526c71d4d",
       "validated": true,
       "submitted_at": "2026-03-17T00:11:27.159Z"
+    }
+  },
+  "participants": {
+    "ce40a29a-ac13-4d94-bd63-858394a8926c": {
+      "id": "ce40a29a-ac13-4d94-bd63-858394a8926c",
+      "event_id": "2f0df4cc-3c1d-403b-ae57-4ce2b6fc76b0",
+      "session_id": "df8bbfb8-8c4f-4c8d-86b9-ae4aa6d86b27",
+      "display_name": "Aditya",
+      "joined_at": "2026-03-16T23:49:42.623Z"
+    }
+  },
+  "participants": {
+    "ce40a29a-ac13-4d94-bd63-858394a8926c": {
+      "id": "ce40a29a-ac13-4d94-bd63-858394a8926c",
+      "event_id": "2f0df4cc-3c1d-403b-ae57-4ce2b6fc76b0",
+      "session_id": "df8bbfb8-8c4f-4c8d-86b9-ae4aa6d86b27",
+      "display_name": "Aditya",
+      "joined_at": "2026-03-16T23:49:42.623Z"
     }
   }
 }

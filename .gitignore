@@ -35,6 +35,7 @@ lerna-debug.log*
 # Firebase / server secrets
 server/*-firebase-adminsdk-*.json
 server/service-account.json
+serviceAccountKey.json
 
 # OS
 .DS_Store

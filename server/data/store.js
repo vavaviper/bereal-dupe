@@ -1,159 +1,137 @@
-const fs = require("fs");
-const path = require("path");
+const { db } = require("../firebase");
 
-const DATA_FILE = path.join(__dirname, "db.json");
+// ── Events ────────────────────────────────────────────────────
 
-const empty = () => ({ events: {}, prompts: {}, submissions: {}, participants: {} });
-
-function load() {
-  try {
-    return JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
-  } catch {
-    return empty();
-  }
+async function getEvents() {
+  const snap = await db.ref("events").once("value");
+  return snap.val() ? Object.values(snap.val()) : [];
 }
 
-function save(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+async function getEvent(id) {
+  const snap = await db.ref(`events/${id}`).once("value");
+  return snap.val() || null;
 }
 
-function getAll() {
-  return load();
-}
-
-function getEvents() {
-  return Object.values(load().events);
-}
-
-function getEvent(id) {
-  return load().events[id] ?? null;
-}
-
-function createEvent(event) {
-  const data = load();
-  data.events[event.id] = event;
-  save(data);
+async function createEvent(event) {
+  await db.ref(`events/${event.id}`).set(event);
   return event;
 }
 
-function getPromptsByEvent(eventId) {
-  const data = load();
-  return Object.values(data.prompts).filter((p) => p.event_id === eventId);
+async function updateEvent(id, updates) {
+  const snap = await db.ref(`events/${id}`).once("value");
+  if (!snap.exists()) return null;
+  await db.ref(`events/${id}`).update(updates);
+  const updated = await db.ref(`events/${id}`).once("value");
+  return updated.val();
 }
 
-function getPrompt(id) {
-  return load().prompts[id] ?? null;
+// ── Prompts ───────────────────────────────────────────────────
+
+async function getPromptsByEvent(eventId) {
+  const snap = await db
+    .ref("prompts")
+    .orderByChild("event_id")
+    .equalTo(eventId)
+    .once("value");
+  return snap.val() ? Object.values(snap.val()) : [];
 }
 
-function createPrompt(prompt) {
-  const data = load();
-  data.prompts[prompt.id] = prompt;
-  save(data);
+async function getPrompt(id) {
+  const snap = await db.ref(`prompts/${id}`).once("value");
+  return snap.val() || null;
+}
+
+async function createPrompt(prompt) {
+  await db.ref(`prompts/${prompt.id}`).set(prompt);
   return prompt;
 }
 
-function updatePrompt(id, updates) {
-  const data = load();
-  if (!data.prompts[id]) return null;
-  Object.assign(data.prompts[id], updates);
-  save(data);
-  return data.prompts[id];
+async function updatePrompt(id, updates) {
+  const snap = await db.ref(`prompts/${id}`).once("value");
+  if (!snap.exists()) return null;
+  await db.ref(`prompts/${id}`).update(updates);
+  const updated = await db.ref(`prompts/${id}`).once("value");
+  return updated.val();
 }
 
-function getActivePrompt(eventId) {
-  const data = load();
-  return (
-    Object.values(data.prompts).find(
-      (p) => p.event_id === eventId && p.active
-    ) ?? null
-  );
+async function deletePrompt(id) {
+  const snap = await db.ref(`prompts/${id}`).once("value");
+  if (!snap.exists()) return false;
+  await db.ref(`prompts/${id}`).remove();
+  return true;
 }
 
-function getSubmissionsByPrompt(promptId) {
-  const data = load();
-  return Object.values(data.submissions).filter(
-    (s) => s.prompt_id === promptId
-  );
+async function getActivePrompt(eventId) {
+  // RTDB doesn't support compound queries — fetch by event_id, filter for active
+  const prompts = await getPromptsByEvent(eventId);
+  return prompts.find((p) => p.active) || null;
 }
 
-function getSubmissionBySession(promptId, sessionId) {
-  const data = load();
-  return (
-    Object.values(data.submissions).find(
-      (s) => s.prompt_id === promptId && s.user_session_id === sessionId
-    ) ?? null
-  );
+// ── Submissions ───────────────────────────────────────────────
+
+async function getSubmissionsByPrompt(promptId) {
+  const snap = await db
+    .ref("submissions")
+    .orderByChild("prompt_id")
+    .equalTo(promptId)
+    .once("value");
+  return snap.val() ? Object.values(snap.val()) : [];
 }
 
-function createSubmission(submission) {
-  const data = load();
-  data.submissions[submission.id] = submission;
-  save(data);
+async function getSubmissionBySession(promptId, sessionId) {
+  // Fetch by prompt_id, then filter for session
+  const subs = await getSubmissionsByPrompt(promptId);
+  return subs.find((s) => s.user_session_id === sessionId) || null;
+}
+
+async function createSubmission(submission) {
+  await db.ref(`submissions/${submission.id}`).set(submission);
   return submission;
 }
 
-function updateEvent(id, updates) {
-  const data = load();
-  if (!data.events[id]) return null;
-  Object.assign(data.events[id], updates);
-  save(data);
-  return data.events[id];
+async function getSubmissionsByEvent(eventId) {
+  const prompts = await getPromptsByEvent(eventId);
+  const promptIds = new Set(prompts.map((p) => p.id));
+  if (promptIds.size === 0) return [];
+
+  // Fetch all submissions for each prompt
+  const results = [];
+  for (const pid of promptIds) {
+    const subs = await getSubmissionsByPrompt(pid);
+    results.push(...subs);
+  }
+  return results;
 }
 
-function deletePrompt(id) {
-  const data = load();
-  if (!data.prompts[id]) return false;
-  delete data.prompts[id];
-  save(data);
-  return true;
+// ── Participants ──────────────────────────────────────────────
+
+async function getParticipantsByEvent(eventId) {
+  const snap = await db
+    .ref("participants")
+    .orderByChild("event_id")
+    .equalTo(eventId)
+    .once("value");
+  return snap.val() ? Object.values(snap.val()) : [];
 }
 
-function getParticipantsByEvent(eventId) {
-  const data = load();
-  if (!data.participants) return [];
-  return Object.values(data.participants).filter((p) => p.event_id === eventId);
-}
-
-function createParticipant(participant) {
-  const data = load();
-  if (!data.participants) data.participants = {};
-  data.participants[participant.id] = participant;
-  save(data);
+async function createParticipant(participant) {
+  await db.ref(`participants/${participant.id}`).set(participant);
   return participant;
 }
 
-function getParticipantBySession(eventId, sessionId) {
-  const data = load();
-  if (!data.participants) return null;
-  return (
-    Object.values(data.participants).find(
-      (p) => p.event_id === eventId && p.session_id === sessionId
-    ) ?? null
-  );
+async function getParticipantBySession(eventId, sessionId) {
+  const participants = await getParticipantsByEvent(eventId);
+  return participants.find((p) => p.session_id === sessionId) || null;
 }
 
-function deleteParticipant(id) {
-  const data = load();
-  if (!data.participants || !data.participants[id]) return false;
-  delete data.participants[id];
-  save(data);
+async function deleteParticipant(id) {
+  const snap = await db.ref(`participants/${id}`).once("value");
+  if (!snap.exists()) return false;
+  await db.ref(`participants/${id}`).remove();
   return true;
 }
 
-function getSubmissionsByEvent(eventId) {
-  const data = load();
-  const promptIds = new Set(
-    Object.values(data.prompts)
-      .filter((p) => p.event_id === eventId)
-      .map((p) => p.id)
-  );
-  return Object.values(data.submissions).filter((s) =>
-    promptIds.has(s.prompt_id)
-  );
-}
-
 module.exports = {
-  getAll,
   getEvents,
   getEvent,
   createEvent,
