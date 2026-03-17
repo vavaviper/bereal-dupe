@@ -112,6 +112,15 @@ export default function CanvasPage() {
                 alt="Submission"
                 className="w-full object-cover"
                 loading="lazy"
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  el.style.display = "none";
+                  el.parentElement?.classList.add("min-h-[120px]", "flex", "items-center", "justify-center");
+                  const span = document.createElement("span");
+                  span.className = "text-zinc-600 text-xs";
+                  span.textContent = "Image unavailable";
+                  el.parentElement?.appendChild(span);
+                }}
               />
               <span
                 className={`absolute top-2 right-2 text-xs font-medium px-2 py-1 rounded-full ${
